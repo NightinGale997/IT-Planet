@@ -1,0 +1,55 @@
+﻿version: '3.4'
+
+services:
+# Сервис для разворачивания контейнера с базой данных
+  database:
+    image: postgres:latest
+    container_name: database
+    volumes:
+      - /var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=animal-chipization
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-d", "animal-chipization" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  planetit:
+    image: planetit
+    container_name: planetit
+    build:
+      context: .
+      dockerfile: PlanetIT/Dockerfile
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=database
+      - DB_NAME=animal-chipization
+      - DB_USER=user
+      - DB_PASSWORD=password
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://planetit:8080/health || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 8
+
+
+# Сервис для разворачивания контейнера с автотестами
+  tests: 
+    image: mrexpen/planet_olymp_phase2
+    pull_policy: always
+    ports:
+      - "8090:8080"
+    depends_on:
+      - planetit
+    environment:
+      SERVER_URL: http://planetit:8080
+      STAGE: all
+      # all - запуск всех тестов из трёх доступных этапов
+      # 0, 1 или 2 - запуск тестов для соответствующего этапа
